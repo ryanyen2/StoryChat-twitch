@@ -1,0 +1,7 @@
+{
+  "name": "tc-io",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue"
+}
