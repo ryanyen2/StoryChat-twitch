@@ -1,10 +1,11 @@
-import { createApp } from 'vue'
+import {createApp} from 'vue'
 import App from './App.vue'
 import router from './router';
 
-import { IonicVue } from '@ionic/vue';
+import {IonicVue} from '@ionic/vue';
 
-import { defineCustomElements } from '@ionic/pwa-elements/loader';
+import {defineCustomElements} from '@ionic/pwa-elements/loader';
+
 defineCustomElements(window);
 
 /* Core CSS required for Ionic components to work properly */
@@ -29,10 +30,10 @@ import './theme/variables.css';
 import {store, key} from './store'
 
 const app = createApp(App)
-  .use(IonicVue)
-  .use(router)
-  .use(store, key);
+    .use(IonicVue)
+    .use(router)
+    .use(store, key);
 
 router.isReady().then(() => {
-  app.mount('#app');
+    app.mount('#app');
 });

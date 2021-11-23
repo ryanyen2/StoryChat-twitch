@@ -105,12 +105,6 @@
                 <ion-icon :icon="gameControllerOutline" color="secondary"></ion-icon>
                 <ion-label>{{ stream.gameName }}</ion-label>
               </ion-chip>
-              <!--              <a :href="`https://www.twitch.tv/${stream.userName}`" target="_blank">-->
-              <!--                <ion-chip>-->
-              <!--                  <ion-icon :icon="open" color="tertiary"></ion-icon>-->
-              <!--                  <ion-label> Check Out</ion-label>-->
-              <!--                </ion-chip>-->
-              <!--              </a>-->
             </ion-card-content>
           </ion-card>
         </div>
@@ -122,6 +116,8 @@
 <script lang="js">
 import {ApiClient} from '@twurple/api';
 import {StaticAuthProvider} from "@twurple/auth";
+import { db } from '@/utils/firebase.ts';
+import { ref, set, push, child, get } from 'firebase/database';
 
 import {
   IonButtons,
@@ -190,20 +186,6 @@ export default {
   },
   methods: {
     async login() {
-      // this.tokenData = {
-      //   accessToken: this.oauth,
-      //   refreshToken: this.oauth,
-      //   expiresIn: 360,
-      //   obtainmentTimestamp: Date.now(),
-      //   scope: []
-      // };
-      //
-      // await window.localStorage.setItem(
-      //   "tokenData",
-      //   JSON.stringify(this.tokenData)
-      // );
-      //
-      // window.location.reload();
       let redirectUrl = new URL(window.location.href)
       redirectUrl.port = ''
       redirectUrl = redirectUrl.toString().replace(/\/$/, "")
@@ -212,16 +194,8 @@ export default {
           `https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=${process.env.VUE_APP_CLIENT_ID}&redirect_uri=${redirectUrl.toString()}&scope=viewing_activity_read user_read channel_read chat:read channel:moderate chat:edit`,
           '_self',
       ).focus()
-      // this.$router.push("/chat");
     },
-    connect(stream) {
-      // await window.localStorage.setItem(
-      //     "channel",
-      //     JSON.stringify({
-      //       name: "test",
-      //       id: "test",
-      //     })
-      // );
+    async connect(stream) {
       this.selectedStream = {
         id: stream.id,
         gameId: stream.gameId,
@@ -232,8 +206,8 @@ export default {
         userName: stream.userName,
         viewers: stream.viewers
       }
+
       this.openAlert = true
-      // this.$router.push({name: 'chat', params: {channel: stream.userName }});
     },
     async logout() {
       this.store.commit(MUTATIONS.CLEAR_CURRENT_USER);
@@ -246,11 +220,6 @@ export default {
     return {people, gameControllerOutline}
   },
   async mounted() {
-    // const tokenData = window.localStorage.getItem("tokenData");
-    // if (tokenData) {
-    // this.tokenData = JSON.parse(tokenData);
-    // console.log('Token Data: ', this.tokenData);
-    // }
     this.store = useStore()
     if (window.location.hash.length > 0) {
       const hash = window.location.hash.substr(1);
@@ -271,6 +240,38 @@ export default {
       const apiClient = new ApiClient({authProvider})
       this.currentUser = await apiClient.users.getMe()
       await this.store.commit(MUTATIONS.SET_CURRENT_USER, this.currentUser)
+
+      const geoLocation = await fetch('https://json.geoiplookup.io/');
+      const geoLocationJson = await geoLocation.json();
+
+      const dbRef = ref(db);
+      await get(child(dbRef, `users/${this.currentUser.id}`)).then(async res => {
+        if (res.exists()) {
+          await push(ref(db, `users/${this.currentUser.id}/loginActivities`), {
+            loginTime: new Date().getTime(),
+            localeTime: new Date().toLocaleString().replace(',',''),
+            ipAddress: geoLocationJson.ip,
+            isp: geoLocationJson.isp,
+            city: geoLocationJson.city,
+            countryCode: geoLocationJson.country_code,
+            countryName: geoLocationJson.country_name
+          })
+        }
+        else {
+          await set(ref(db, 'users/' + this.currentUser.id), {
+            username: this.currentUser.name,
+            email: this.currentUser.email,
+            displayName: this.currentUser.displayName,
+            profilePictureUrl: this.currentUser.profilePictureUrl,
+            description: this.currentUser.description,
+            views: this.currentUser.views,
+            type: this.currentUser.type,
+            firstLoginAt: new Date().getTime(),
+            loginActivities: [],
+            connectActivities: [],
+          })
+        }
+      }).catch(console.error)
 
       const returnStreams = await apiClient.streams.getStreams({
         language: 'en',
@@ -521,7 +522,6 @@ body, html {
   animation-fill-mode: forwards;
   -webkit-animation: shadow-anim 0.7s 3s 1 ease;
   -webkit-animation-fill-mode: forwards;
-  opacity: 0;
   z-index: 5;
 }
 

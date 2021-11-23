@@ -20,7 +20,43 @@ export class ChatFilter {
 
         return containProf
     }
+
+
+    existRepeatedCharacter(text: string): boolean {
+        if (text.length == 1) return false;
+
+        for (let i = 1; i <= text.length / 2; i ++) {
+            if (text.length % i) continue
+            const sub = text.substring(0, i)
+            if (this.isRepeating(sub, text)) return true;
+        }
+
+        return false;
+    }
+
+    isRepeating = (sub: any, str: any): boolean => {
+        if(str.length > sub.length)
+            return str.substring(0,sub.length) ===sub && this.isRepeating(sub, str.substring(sub.length, str.length));
+
+        return str === sub;
+    }
+
+    findDuplicateWords = (str: string): string => {
+        const strArr = str.split(" ");
+        const res = [] as Array<string>;
+        for(let i = 0; i < strArr.length; i++){
+            if(strArr.indexOf(strArr[i]) !== strArr.lastIndexOf(strArr[i])){
+                if(!res.includes(strArr[i])){
+                    res.push(strArr[i]);
+                }
+            }
+        }
+
+        return res.join(" ");
+    };
 }
+
+
 
 export const chatFilter = new ChatFilter();
 export default chatFilter;
