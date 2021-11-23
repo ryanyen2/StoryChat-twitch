@@ -182,7 +182,7 @@ export default {
         {
           text: 'Ok',
           handler: () => {
-            this.$router.push({name: 'chat', params: {channel: this.selectedStream}});
+            this.$router.push({name: 'chat', params: {...this.selectedStream}});
           },
         },
       ],
@@ -222,7 +222,16 @@ export default {
       //       id: "test",
       //     })
       // );
-      this.selectedStream = stream.userName
+      this.selectedStream = {
+        id: stream.id,
+        gameId: stream.gameId,
+        startDate: stream.startDate,
+        title: stream.title,
+        userDisplayName: stream.userDisplayName,
+        userId: stream.userId,
+        userName: stream.userName,
+        viewers: stream.viewers
+      }
       this.openAlert = true
       // this.$router.push({name: 'chat', params: {channel: stream.userName }});
     },

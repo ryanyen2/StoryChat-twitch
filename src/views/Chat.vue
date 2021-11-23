@@ -1,8 +1,8 @@
 <template>
-  <ion-page>
+  <ion-page v-if="currentChannel">
     <ion-header :translucent="true">
       <ion-toolbar>
-        <ion-title>{{ `${currentChannel}'s chatroom` }}</ion-title>
+        <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>
         <ion-buttons slot="start">
           <ion-back-button color="primary" default-href="/"></ion-back-button>
         </ion-buttons>
@@ -12,7 +12,7 @@
     <ion-content :fullscreen="true">
       <ion-header collapse="condense">
         <ion-toolbar>
-          <ion-title>{{ `${currentChannel}'s chatroom` }}</ion-title>
+          <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>
         </ion-toolbar>
       </ion-header>
 
@@ -22,11 +22,10 @@
           ref="container"
       >
         <ion-list id="chat-list">
-          <ion-item v-for="msg in messages" :key="msg.id">
-            <span :style="{ color: msg.color ? msg.color : '#9147FF' }">{{
-                msg.user
-              }}</span>
-            <ion-label>: {{ msg.message }}</ion-label>
+          <ion-item v-for="msg in messages" :key="msg.id" style="align-items: baseline">
+            <ion-label>
+              <span v-html="msg.message"></span>
+            </ion-label>
           </ion-item>
         </ion-list>
       </div>
@@ -80,7 +79,10 @@ import {happyOutline, sendOutline} from "ionicons/icons";
 
 import {StaticAuthProvider} from "@twurple/auth";
 import {ChatClient} from "@twurple/chat";
+import {ApiClient} from '@twurple/api';
 import {useStore} from "@/store";
+
+import { chatFilter } from '@/utils/chat-filter.ts'
 
 export default {
   name: "Folder",
@@ -109,13 +111,23 @@ export default {
       followAgeListener: null,
       accessToken: "",
       currentUser: {},
+
+      emotesList: [],
+
+      // filter function
+      filters: {
+        profanityFilter: true,
+        exEmotesFilter: 10,
+      },
+
+      containProfanity: false,
+      containExEmotes: false
     };
   },
   methods: {
     sendMessage() {
       if (this.message.length > 0) {
-        console.log(this.message);
-        this.chatClient.say(this.currentChannel, this.message);
+        this.chatClient.say(this.currentChannel.userName, this.message);
         this.messages.push({
           id: this.uuidv4(),
           user: this.currentUser.displayName,
@@ -140,27 +152,56 @@ export default {
     const store = useStore();
     this.accessToken = store.state.token
     this.currentUser = store.state.currentUser
-    this.currentChannel = this.$route.params.channel
-    window.open(`https://www.twitch.tv/${this.currentChannel}`, '_blank').focus()
-
-    console.log(this.accessToken, this.currentUser)
+    this.currentChannel = this.$route.params
+    console.log(this.currentChannel)
+    window.open(`https://www.twitch.tv/${this.currentChannel.userName}`, '_blank').focus()
 
     const authProvider = new StaticAuthProvider(
         this.clientId,
         this.accessToken
     );
-    this.chatClient = new ChatClient({authProvider, channels: [this.currentChannel]});
+    const apiClient = new ApiClient({authProvider})
+
+    // const badges = await apiClient.chat.getChannelBadges(this.currentChannel)
+    // console.log('BADGES: ', badges)
+
+    const channelEmotesList = await apiClient.chat.getChannelEmotes(this.currentChannel.userId)
+    const globalEmotesList = await apiClient.chat.getGlobalEmotes()
+    this.emotesList = channelEmotesList.concat(globalEmotesList)
+
+    this.chatClient = new ChatClient({authProvider, channels: [this.currentChannel.userName]});
     await this.chatClient.connect();
 
     this.followAgeListener = this.chatClient.onMessage(
         async (channel, user, message, msg) => {
-          // this.currentChannel = channel;
-          // console.log(user, msg);
+          this.containExEmotes = false
+          this.containProfanity = false
+
+          const { profanityFilter, exEmotesFilter } = {...this.filters}
+          if (profanityFilter) this.containProfanity = chatFilter.existsProfanity(message)
+
+          if (exEmotesFilter > 0)  {
+            let emoteCount = 0
+            this.emotesList.map(emote => {
+              const idx = message.indexOf(emote.name)
+              if (!this.containExEmotes && idx !== -1 && emote.name !== ':/') {
+                emoteCount += 1
+                const emoteUrl = emote.getImageUrl(1)
+                if (emoteCount < exEmotesFilter) {
+                  message = message.replace(emote.name, `<img src="${emoteUrl}" alt="emote_${emote.id}" />`)
+                } else this.containExEmotes = true
+              }
+            })
+          }
+
+          if (this.containExEmotes) console.log(`!!TOO MANY EMOTES!!\n${message}`)
+          if(this.containProfanity) console.log(`!!PROFANITY MESSAGES!!\n${message}`)
+          const colorMsg = msg.userInfo.color ? msg.userInfo.color : '#9147FF';
+
           this.messages.push({
             id: msg.id,
             user: user,
-            color: msg.userInfo.color,
-            message: message,
+            message: `<p style="white-space: break-spaces"><span style="color: ${colorMsg}">${user}: </span>${message}</p>`,
           });
           const container = this.$el.querySelector("#container");
           container.scrollTop = container.scrollHeight;
@@ -172,8 +213,8 @@ export default {
   },
 };
 </script>
-
 <style scoped>
+
 #container {
   text-align: center;
   position: absolute;
