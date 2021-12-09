@@ -1,12 +1,13 @@
 <template>
   <ion-page v-if="currentChannel">
     <ion-header :translucent="true">
-      <ion-toolbar>
-        <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>
-        <ion-buttons slot="start">
-          <ion-back-button color="primary" default-href="/"></ion-back-button>
-        </ion-buttons>
-      </ion-toolbar>
+      <ion-back-button color="primary" :text=null default-href="/" style="left: 5px; position: absolute;" />
+<!--      <ion-toolbar>-->
+<!--        <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>-->
+<!--        <ion-buttons slot="start">-->
+<!--          <ion-back-button color="primary" default-href="/"></ion-back-button>-->
+<!--        </ion-buttons>-->
+<!--      </ion-toolbar>-->
     </ion-header>
 
     <ion-content :fullscreen="true">
@@ -21,7 +22,7 @@
 
       <div
           id="container"
-          style="max-height: 70%; padding-bottom: 55px; overflow-y: auto; top:60%"
+          style="max-height: 70%; padding-bottom: 55px; overflow-y: auto; top:62%"
           ref="container"
       >
         <ion-list id="chat-list">
@@ -63,12 +64,12 @@
 
 <script>
 import {
-  IonButtons,
+  // IonButtons,
   IonContent,
   IonFooter,
   IonHeader,
   IonPage,
-  IonTitle,
+
   IonToolbar,
   IonInput,
   IonItem,
@@ -94,11 +95,10 @@ import bg from '@/static/images/background.gif';
 export default {
   name: "Folder",
   components: {
-    IonButtons,
+    // IonButtons,
     IonContent,
     IonHeader,
     IonPage,
-    IonTitle,
     IonToolbar,
     IonFooter,
     IonInput,
