@@ -80,18 +80,20 @@
                   color="warning"
               > Logout
               </ion-button>
+
+              <ion-searchbar v-model="searchWords" animated placeholder="Search Channel"></ion-searchbar>
             </ion-card-content>
           </ion-card>
           <ion-card v-for="stream in streams" :key="stream.id" @click.end="connect(stream)">
             <ion-card-header>
-              <ion-card-title>{{ stream.userDisplayName }}</ion-card-title>
-              <ion-card-subtitle>{{ stream.title }}</ion-card-subtitle>
+              <ion-card-title>{{ stream['userDisplayName']? stream.userDisplayName : stream.displayName }}</ion-card-title>
+              <ion-card-subtitle>{{ stream['title']? stream.title : stream.gameName }}</ion-card-subtitle>
             </ion-card-header>
             <ion-alert
                 :is-open="openAlert"
                 header="Connect?"
                 sub-header="redirect page alert"
-                :message="`connect chat to ${stream.userDisplayName}`"
+                :message="`connect chat to ${stream['userDisplayName']? stream.userDisplayName : stream.displayName}`"
                 :buttons="alertButtons"
                 @didDismiss="openAlert = false"
             >
@@ -99,7 +101,7 @@
             <ion-card-content>
               <ion-chip>
                 <ion-icon :icon="people" color="primary"></ion-icon>
-                <ion-label>{{ stream.viewers }}</ion-label>
+                <ion-label>{{ stream['viewers']? stream.viewers : stream.language }}</ion-label>
               </ion-chip>
               <ion-chip>
                 <ion-icon :icon="gameControllerOutline" color="secondary"></ion-icon>
@@ -133,11 +135,13 @@ import {
   IonAlert,
   IonChip,
   IonLabel,
-  IonIcon
+  IonIcon,
+    IonSearchbar
 } from "@ionic/vue";
 
 import {people, gameControllerOutline} from 'ionicons/icons';
 import {useStore, MUTATIONS} from "@/store";
+let apiClient;
 
 export default {
   name: "Folder",
@@ -155,7 +159,8 @@ export default {
     IonAvatar,
     IonChip,
     IonIcon,
-    IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle
+    IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
+    IonSearchbar
   },
   data() {
     return {
@@ -164,6 +169,9 @@ export default {
       token: "",
       currentUser: null,
       streams: [],
+      searchWords: "",
+      searchedStreams: [],
+
       openAlert: false,
       selectedStream: null,
       alertButtons: [
@@ -184,6 +192,17 @@ export default {
       ],
     };
   },
+  watch: {
+    async searchWords(val) {
+      if (val.length > 1) {
+        const channels = await apiClient.search.searchChannels(val, {
+          liveOnly: true,
+          limit: 20
+        })
+        this.streams = channels.data
+      }
+    }
+  },
   methods: {
     async login() {
       let redirectUrl = new URL(window.location.href)
@@ -196,15 +215,17 @@ export default {
       ).focus()
     },
     async connect(stream) {
+      const user = await stream.getUser()
+
       this.selectedStream = {
         id: stream.id,
         gameId: stream.gameId,
+        gameName: stream.gameName,
         startDate: stream.startDate,
-        title: stream.title,
-        userDisplayName: stream.userDisplayName,
-        userId: stream.userId,
-        userName: stream.userName,
-        viewers: stream.viewers
+        // title: stream['title']? stream.title : null,
+        userDisplayName: user.displayName,
+        userId: user.id,
+        userName: user.name
       }
 
       this.openAlert = true
@@ -237,7 +258,7 @@ export default {
       )
       await this.store.commit(MUTATIONS.SET_TOKEN, this.token)
 
-      const apiClient = new ApiClient({authProvider})
+      apiClient = new ApiClient({authProvider})
       this.currentUser = await apiClient.users.getMe()
       await this.store.commit(MUTATIONS.SET_CURRENT_USER, this.currentUser)
 

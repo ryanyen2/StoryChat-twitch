@@ -41,7 +41,7 @@ export class ChatFilter {
         return str === sub;
     }
 
-    findDuplicateWords = (str: string): string => {
+    findDuplicateWords = (str: string): boolean => {
         const strArr = str.split(" ");
         const res = [] as Array<string>;
         for(let i = 0; i < strArr.length; i++){
@@ -52,7 +52,14 @@ export class ChatFilter {
             }
         }
 
-        return res.join(" ");
+        let reWord = res.join(" ")
+        reWord += ''
+        str += ''
+        if (reWord.length <= 2) return false
+        else {
+            return (str.match( new RegExp(
+                    reWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length > 2
+        }
     };
 }
 

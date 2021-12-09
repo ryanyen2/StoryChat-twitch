@@ -10,15 +10,18 @@
     </ion-header>
 
     <ion-content :fullscreen="true">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>
-        </ion-toolbar>
-      </ion-header>
+<!--      <ion-header collapse="condense">-->
+<!--        <ion-toolbar>-->
+<!--          <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>-->
+<!--        </ion-toolbar>-->
+<!--      </ion-header>-->
+      <div style="position: fixed; top: 0;">
+        <img :src="bg" alt="background-image">
+      </div>
 
       <div
           id="container"
-          style="max-height: 90%; padding-bottom: 55px; overflow-y: auto"
+          style="max-height: 70%; padding-bottom: 55px; overflow-y: auto; top:60%"
           ref="container"
       >
         <ion-list id="chat-list">
@@ -86,6 +89,8 @@ import { chatFilter } from '@/utils/chat-filter.ts'
 import { db } from '@/utils/firebase.ts';
 import { ref, push, update } from 'firebase/database';
 
+import bg from '@/static/images/background.gif';
+
 export default {
   name: "Folder",
   components: {
@@ -113,19 +118,18 @@ export default {
       followAgeListener: null,
       accessToken: "",
       currentUser: {},
+      isAdmin: false,
 
       emotesList: [],
 
-      currentChannelMetadata: {
+      currentChannelMeta: {
         allMessagesCount: 0,
-        allTrollingMessagesCount: 0,
-        allSentMessagesCount: 0,
-        allSentTrollingMessagesCount: 0,
-        stayInTimeDuration: 0,
+        allMessagesList: [],
 
-        allSentMessagesList: [],
-        allTrollingMessagesList: [],
-        allSentTrollingMessagesList: []
+        normMessagesCount: 0,
+        trollingMessagesCount: 0,
+        sentMessagesCount: 0,
+        sentTrollingMessagesCount: 0,
       },
 
       // filter function
@@ -153,51 +157,35 @@ export default {
         this.messages.push({
           id: this.uuidv4(),
           user: this.currentUser.displayName,
-          message: this.message,
-          color: "#ff9900",
+          message: `<p style="white-space: break-spaces"><span style="color: #ff9900">${this.currentUser.displayName}: </span>${this.message}</p>`,
         });
+        if (this.messages.length >= 50) this.messages.shift()
         this.message = "";
       }
     },
     uuidv4() {
       return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
     },
-    async updateMessageRecords(isMe, message){
-      this.currentChannelMetadata.allMessagesCount += 1
-      if (isMe) {
-        this.currentChannelMetadata.allSentMessagesCount += 1
-        this.currentChannelMetadata.allSentMessagesList.push({
-          chatMessage: message,
-          receivedTime: new Date().getTime(),
-        })
-      }
-
-      await update(ref(db, `users/${this.currentUser.id}/connectActivities/${this.currentChannel.dbKey}`), {
-        allMessagesCount: this.currentChannelMetadata.allMessagesCount,
-        allSentMessagesCount: this.currentChannelMetadata.allSentMessagesCount,
-        allSentMessagesList: this.currentChannelMetadata.allSentMessagesList
-      })
-    },
-    async updateTrollsRecord(trollType, message, threshold, isMe) {
-      this.currentChannelMetadata.allTrollingMessagesCount += 1
-      if (isMe) {
-        this.currentChannelMetadata.allSentTrollingMessagesCount += 1
-        this.currentChannelMetadata.allSentTrollingMessagesList.push({
-          trollType: trollType,
-          chatMessage: message,
-          currentThreshold: threshold
-        })
-      }
-
-      this.currentChannelMetadata.allTrollingMessagesList.push({
+    async updateMessageRecords(isAdmin, isMe, message, isTroll, trollType=null, thresh=null){
+      this.currentChannelMeta.allMessagesCount += 1
+      this.currentChannelMeta.allMessagesList.push({
+        isAdmin: isAdmin,
+        isSentByMe: isMe,
+        isTroll: isTroll,
         trollType: trollType,
+        threshold: thresh,
         chatMessage: message,
-        currentThreshold: threshold,
         receivedTime: new Date().getTime(),
       })
 
+      if (isTroll && isMe) this.currentChannelMeta.sentTrollingMessagesCount += 1
+      else if (isTroll) this.currentChannelMeta.trollingMessagesCount += 1
+      else if (isMe) this.currentChannelMeta.sentMessagesCount += 1
+      else this.currentChannelMeta.normMessagesCount += 1
+
+
       await update(ref(db, `users/${this.currentUser.id}/connectActivities/${this.currentChannel.dbKey}`), {
-        ...this.currentChannelMetadata
+        ...this.currentChannelMeta
       })
     },
     async storeConnectionRecord() {
@@ -206,12 +194,12 @@ export default {
         localeConnectTime: new Date().toLocaleString().replace(',',''),
         streamId: this.currentChannel.id,
         gameId: this.currentChannel.gameId,
-        title: this.currentChannel.title,
+        // title: this.currentChannel.title,
         streamerDisplayName: this.currentChannel.userDisplayName,
         streamerId: this.currentChannel.userId,
         streamerUserName: this.currentChannel.userName,
-        currentViewers: this.currentChannel.viewers,
-        ...this.currentChannelMetadata,
+        // currentViewers: this.currentChannel.viewers,
+        ...this.currentChannelMeta,
       }).then(res => this.currentChannel = {...this.currentChannel, dbKey: res.key})
     }
   },
@@ -220,12 +208,15 @@ export default {
       sendOutline,
       happyOutline,
       clientId: process.env.VUE_APP_CLIENT_ID,
+      bg,
     };
   },
   async mounted() {
     const store = useStore();
     this.accessToken = store.state.token
     this.currentUser = store.state.currentUser
+    if (this.currentUser.name === process.env.VUE_APP_ADMIN_NAME) this.isAdmin = true
+
     this.currentChannel = this.$route.params
     // console.log(this.currentChannel)
     window.open(`https://www.twitch.tv/${this.currentChannel.userName}`, '_blank').focus()
@@ -252,10 +243,8 @@ export default {
           this.containExCaps = false
           this.containLargeText = false
           this.containRepeatedWords = false
-          const sentByMe = this.currentUser.displayName === user
-          await this.updateMessageRecords(sentByMe, message)
 
-          const { repeatedWordsFilter, repeatedCharacterFilter, profanityFilter, exEmotesFilter, exCapsFilter, largeTextFilter } = {...this.filters}
+          const { repeatedWordsFilter, profanityFilter, exEmotesFilter, exCapsFilter, largeTextFilter } = {...this.filters}
           if (profanityFilter) this.containProfanity = chatFilter.existsProfanity(message)
 
           if (exEmotesFilter > 0)  {
@@ -272,20 +261,22 @@ export default {
             })
           }
 
-          if (repeatedWordsFilter) {
-            const repeatedWords = chatFilter.findDuplicateWords(message)
-            this.containRepeatedWords = repeatedWords.length > 0
-          }
-          if (repeatedCharacterFilter) this.containRepeatedCharacter = chatFilter.existRepeatedCharacter(message)
+          if (repeatedWordsFilter) this.containRepeatedWords = chatFilter.findDuplicateWords(message)
+          // if (repeatedCharacterFilter) this.containRepeatedCharacter = chatFilter.existRepeatedCharacter(message)
           if (largeTextFilter > 0) this.containLargeText = message.length >= largeTextFilter
           if (exCapsFilter > 0) this.containExCaps = ((message.length - message.replace(/[A-Z]/g, '').length)/ message.length) >= exCapsFilter
 
-          if (this.containRepeatedWords) await this.updateTrollsRecord('repWords', message, null, sentByMe)
-          if (this.containExEmotes) await this.updateTrollsRecord('exEmotes', message, exEmotesFilter, sentByMe)
-          if (this.containProfanity) await this.updateTrollsRecord('profanity', message, null, sentByMe)
-          if (this.containExCaps) await this.updateTrollsRecord('exCaps', message, exCapsFilter, sentByMe)
-          if (this.containRepeatedCharacter) await this.updateTrollsRecord('repChar', message, null, sentByMe)
-          if (this.containLargeText) await this.updateTrollsRecord('largeText', message, largeTextFilter, sentByMe)
+          const sentByMe = this.currentUser.displayName === user
+          const isSentByAdmin = this.currentUser.displayName === user
+          if (this.containProfanity) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'profanity', null)
+          else if (this.containRepeatedWords) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'repWords', null)
+          else if (this.containExEmotes) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'exEmotes', exEmotesFilter)
+          else if (this.containExCaps) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'exCaps', exCapsFilter)
+          // else if (this.containRepeatedCharacter) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'repChar', null)
+          else if (this.containLargeText) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'largeText', largeTextFilter)
+          else {
+            await this.updateMessageRecords(isSentByAdmin, sentByMe, message, false)
+          }
 
           const colorMsg = msg.userInfo.color ? msg.userInfo.color : '#9147FF';
 
@@ -294,6 +285,8 @@ export default {
             user: user,
             message: `<p style="white-space: break-spaces"><span style="color: ${colorMsg}">${user}: </span>${message}</p>`,
           });
+          if (this.messages.length >= 50) this.messages.shift()
+
           const container = this.$el.querySelector("#container");
           container.scrollTop = container.scrollHeight;
         }
