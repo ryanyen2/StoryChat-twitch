@@ -1,64 +1,76 @@
 <template>
   <ion-page v-if="currentChannel">
     <ion-header :translucent="true">
-      <ion-back-button color="primary" :text=null default-href="/" style="left: 5px; position: absolute;" />
-<!--      <ion-toolbar>-->
-<!--        <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>-->
-<!--        <ion-buttons slot="start">-->
-<!--          <ion-back-button color="primary" default-href="/"></ion-back-button>-->
-<!--        </ion-buttons>-->
-<!--      </ion-toolbar>-->
+      <ion-back-button color="primary" :text=null default-href="/" style="left: 5px; position: absolute;"/>
     </ion-header>
 
     <ion-content :fullscreen="true">
-<!--      <ion-header collapse="condense">-->
-<!--        <ion-toolbar>-->
-<!--          <ion-title>{{ `${currentChannel.userDisplayName}'s chatroom` }}</ion-title>-->
-<!--        </ion-toolbar>-->
-<!--      </ion-header>-->
-      <div style="position: fixed; top: 0;">
-        <img :src="bg" alt="background-image">
-      </div>
-
-      <div
-          id="container"
-          style="max-height: 70%; padding-bottom: 55px; overflow-y: auto; top:62%"
-          ref="container"
-      >
-        <ion-list id="chat-list">
-          <ion-item v-for="msg in messages" :key="msg.id" style="align-items: baseline">
-            <ion-label>
-              <span v-html="msg.message"></span>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </div>
+      <ion-grid>
+        <ion-row>
+          <ion-col size="8" style="height: 100vh">
+            <div ref="twitchVideo"></div>
+          </ion-col>
+          <ion-col size="4">
+            <ion-row>
+              <ion-col size="12">
+                <div>
+                  <img :src="getImgUrl(currentStoryImg)" :alt="`currentImg-${currentStoryImg}`">
+                </div>
+              </ion-col>
+              <ion-col size="12">
+                <DynamicScroller
+                    id="container"
+                    class="scroller"
+                    :items="messages"
+                    key-field="id"
+                    :min-item-size="32"
+                >
+                  <template v-slot="{ item, index, active }">
+                    <DynamicScrollerItem
+                        :item="item"
+                        :active="active"
+                        :size-dependencies="[item.message,]"
+                        :data-index="index"
+                    >
+                      <div class="text"  v-html="item.message"></div>
+                    </DynamicScrollerItem>
+                  </template>
+<!--                  <template v-slot="{ item }">-->
+<!--                    <ion-item style="align-items: baseline">-->
+<!--                      <ion-label>-->
+<!--                        <span v-html="item.message"></span>-->
+<!--                      </ion-label>-->
+<!--                    </ion-item>-->
+<!--                  </template>-->
+                </DynamicScroller>
+              </ion-col>
+              <ion-col size="12">
+                <ion-item>
+                  <ion-input
+                      @keyup.enter="sendMessage"
+                      clear-input
+                      type="text"
+                      placeholder="Send a message"
+                      v-model="message"
+                  ></ion-input>
+                  <ion-button shape="round" size="small" fill="clear" color="medium">
+                    <ion-icon slot="icon-only" :icon="happyOutline"></ion-icon>
+                  </ion-button>
+                  <ion-button
+                      shape="round"
+                      size="small"
+                      fill="clear"
+                      @click.end="sendMessage"
+                  >
+                    <ion-icon slot="icon-only" :icon="sendOutline"></ion-icon>
+                  </ion-button>
+                </ion-item>
+              </ion-col>
+            </ion-row>
+          </ion-col>
+        </ion-row>
+      </ion-grid>
     </ion-content>
-
-    <ion-footer class="ion-no-border" style="padding: 5px">
-      <ion-toolbar>
-        <ion-item>
-          <ion-input
-              @keyup.enter="sendMessage"
-              clear-input
-              type="text"
-              placeholder="Send a message"
-              v-model="message"
-          ></ion-input>
-          <ion-button shape="round" size="small" fill="clear" color="medium">
-            <ion-icon slot="icon-only" :icon="happyOutline"></ion-icon>
-          </ion-button>
-          <ion-button
-              shape="round"
-              size="small"
-              fill="clear"
-              @click.end="sendMessage"
-          >
-            <ion-icon slot="icon-only" :icon="sendOutline"></ion-icon>
-          </ion-button>
-        </ion-item>
-      </ion-toolbar>
-    </ion-footer>
   </ion-page>
 </template>
 
@@ -66,31 +78,33 @@
 import {
   // IonButtons,
   IonContent,
-  IonFooter,
   IonHeader,
   IonPage,
-
-  IonToolbar,
+  IonGrid,
+  IonRow,
+  IonCol,
   IonInput,
   IonItem,
   IonIcon,
-  IonLabel,
-  IonList,
   IonButton,
   IonBackButton,
+  // IonLabel
 } from "@ionic/vue";
 import {happyOutline, sendOutline} from "ionicons/icons";
+import {DynamicScroller, DynamicScrollerItem} from 'vue-virtual-scroller'
 
 import {StaticAuthProvider} from "@twurple/auth";
 import {ChatClient} from "@twurple/chat";
 import {ApiClient} from '@twurple/api';
 import {useStore} from "@/store";
 
-import { chatFilter } from '@/utils/chat-filter.ts'
-import { db } from '@/utils/firebase.ts';
-import { ref, push, update } from 'firebase/database';
+import {chatFilter} from '@/utils/chat-filter.ts'
+import {db} from '@/utils/firebase.ts';
+import {ref, push, update} from 'firebase/database';
 
 import bg from '@/static/images/background.gif';
+import {loadScript} from "vue-plugin-load-script";
+let timeInterval;
 
 export default {
   name: "Folder",
@@ -99,15 +113,17 @@ export default {
     IonContent,
     IonHeader,
     IonPage,
-    IonToolbar,
-    IonFooter,
     IonInput,
-    IonItem,
     IonIcon,
-    IonLabel,
-    IonList,
+    IonGrid,
+    IonRow,
+    IonCol,
     IonButton,
-    IonBackButton
+    IonBackButton,
+    DynamicScroller,
+    DynamicScrollerItem,
+    IonItem,
+    // IonLabel
   },
   data() {
     return {
@@ -148,6 +164,23 @@ export default {
       containRepeatedWords: false,
       containLargeText: false,
       containRepeatedCharacter: false,
+
+      // twitch video
+      videoPlayer: null,
+
+      // images animation
+      timer: 0,
+      countTime: 0,
+      storyLoop: 0,
+
+      currentStoryImg: 0,
+      currentTrollInLoop: 0,
+      trollLoopCount: 0,
+      loopTrollThresh: 2,
+
+      currentNormInLoop: 0,
+      normLoopCount: 0,
+      loopNormThresh: 5,
     };
   },
   methods: {
@@ -166,7 +199,11 @@ export default {
     uuidv4() {
       return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
     },
-    async updateMessageRecords(isAdmin, isMe, message, isTroll, trollType=null, thresh=null){
+    getImgUrl(num) {
+      const images = require.context('../static/images/', false, /\.gif$/)
+      return images('./' + num + ".gif")
+    },
+    async updateMessageRecords(isAdmin, isMe, message, isTroll, trollType = null, thresh = null) {
       this.currentChannelMeta.allMessagesCount += 1
       this.currentChannelMeta.allMessagesList.push({
         isAdmin: isAdmin,
@@ -179,19 +216,88 @@ export default {
       })
 
       if (isTroll && isMe) this.currentChannelMeta.sentTrollingMessagesCount += 1
-      else if (isTroll) this.currentChannelMeta.trollingMessagesCount += 1
+      else if (isTroll) {
+        this.currentChannelMeta.trollingMessagesCount += 1
+        this.currentTrollInLoop += 1
+      }
       else if (isMe) this.currentChannelMeta.sentMessagesCount += 1
-      else this.currentChannelMeta.normMessagesCount += 1
+      else {
+        this.currentChannelMeta.normMessagesCount += 1
+        this.currentNormInLoop += 1
+      }
 
 
       await update(ref(db, `users/${this.currentUser.id}/connectActivities/${this.currentChannel.dbKey}`), {
         ...this.currentChannelMeta
       })
     },
+    changeStoryHandler() {
+      this.timer += 1
+      console.log(this.currentStoryImg, this.currentTrollInLoop, this.currentNormInLoop)
+      switch (this.currentStoryImg) {
+        case 0:
+          if (this.timer > 10) {
+            this.currentStoryImg = 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+          }
+          break;
+        case 2:
+          if (this.currentTrollInLoop > this.loopTrollThresh) {
+            this.trollLoopCount += 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+            this.currentStoryImg += 1
+          } else if ((this.currentNormInLoop / 2) - this.currentTrollInLoop > this.loopNormThresh) {
+            this.currentStoryImg -= 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+          }
+          break;
+        case 1:
+        case 3:
+          if (this.currentTrollInLoop > this.loopTrollThresh) {
+            this.trollLoopCount += 1
+            this.currentTrollInLoop = 0
+            this.currentStoryImg += 1
+            this.currentNormInLoop = 0
+          }
+          break;
+        case 4:
+        case 5:
+          if ((this.currentNormInLoop - this.currentTrollInLoop) > this.loopNormThresh) {
+            this.normLoopCount += 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+            this.currentStoryImg += 1
+          }
+          break;
+        case 6:
+        case 7:
+        case 8:
+          this.countTime += 1
+          if (this.countTime > 3) {
+            this.countTime = 0
+            this.currentStoryImg += 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+          }
+          break;
+        case 9:
+          if (this.currentTrollInLoop > this.loopTrollThresh) {
+            this.trollLoopCount += 1
+            this.currentNormInLoop = 0
+            this.currentTrollInLoop = 0
+            this.currentStoryImg = 1
+            this.storyLoop += 1
+          }
+          break;
+      }
+    },
     async storeConnectionRecord() {
       await push(ref(db, `users/${this.currentUser.id}/connectActivities`), {
         connectTime: new Date().getTime(),
-        localeConnectTime: new Date().toLocaleString().replace(',',''),
+        localeConnectTime: new Date().toLocaleString().replace(',', ''),
         streamId: this.currentChannel.id,
         gameId: this.currentChannel.gameId,
         // title: this.currentChannel.title,
@@ -219,7 +325,7 @@ export default {
 
     this.currentChannel = this.$route.params
     // console.log(this.currentChannel)
-    window.open(`https://www.twitch.tv/${this.currentChannel.userName}`, '_blank').focus()
+    // window.open(`https://www.twitch.tv/${this.currentChannel.userName}`, '_blank').focus()
 
     await this.storeConnectionRecord();
 
@@ -244,10 +350,16 @@ export default {
           this.containLargeText = false
           this.containRepeatedWords = false
 
-          const { repeatedWordsFilter, profanityFilter, exEmotesFilter, exCapsFilter, largeTextFilter } = {...this.filters}
+          const {
+            repeatedWordsFilter,
+            profanityFilter,
+            exEmotesFilter,
+            exCapsFilter,
+            largeTextFilter
+          } = {...this.filters}
           if (profanityFilter) this.containProfanity = chatFilter.existsProfanity(message)
 
-          if (exEmotesFilter > 0)  {
+          if (exEmotesFilter > 0) {
             let emoteCount = 0
             this.emotesList.map(emote => {
               const idx = message.indexOf(emote.name)
@@ -264,7 +376,7 @@ export default {
           if (repeatedWordsFilter) this.containRepeatedWords = chatFilter.findDuplicateWords(message)
           // if (repeatedCharacterFilter) this.containRepeatedCharacter = chatFilter.existRepeatedCharacter(message)
           if (largeTextFilter > 0) this.containLargeText = message.length >= largeTextFilter
-          if (exCapsFilter > 0) this.containExCaps = ((message.length - message.replace(/[A-Z]/g, '').length)/ message.length) >= exCapsFilter
+          if (exCapsFilter > 0) this.containExCaps = ((message.length - message.replace(/[A-Z]/g, '').length) / message.length) >= exCapsFilter
 
           const sentByMe = this.currentUser.displayName === user
           const isSentByAdmin = this.currentUser.displayName === user
@@ -291,22 +403,39 @@ export default {
           container.scrollTop = container.scrollHeight;
         }
     );
+    loadScript('https://player.twitch.tv/js/embed/v1.js').then(() => {
+      const options = {
+        width: '100%',
+        height: window.innerHeight,
+        channel: this.currentChannel.userName,
+        allowfullscreen: false
+      }
+
+      this.videoPlayer = new window.Twitch.Player(this.$refs.twitchVideo, options);
+      this.videoPlayer.addEventListener('ready', () => {
+        this.videoPlayer.setQuality(1080);
+        this.videoPlayer.setVolume(0.5);
+      });
+    })
+
+    timeInterval = setInterval(this.changeStoryHandler, 1000)
   },
   beforeUnmount() {
     this.chatClient.removeListener(this.followAgeListener);
+    clearInterval(timeInterval)
   },
 };
 </script>
 <style scoped>
 
-#container {
-  text-align: center;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-}
+/*#container {*/
+/*  text-align: center;*/
+/*  position: absolute;*/
+/*  left: 0;*/
+/*  right: 0;*/
+/*  top: 50%;*/
+/*  transform: translateY(-50%);*/
+/*}*/
 
 #container strong {
   font-size: 20px;
@@ -322,5 +451,9 @@ export default {
 
 #container a {
   text-decoration: none;
+}
+
+.scroller {
+  height: 50vh;
 }
 </style>

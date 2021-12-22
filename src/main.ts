@@ -29,9 +29,15 @@ import './theme/variables.css';
 
 import {store, key} from './store'
 
+// import { RecycleScroller } from 'vue-virtual-scroller';
+// import VueVirtualScroller from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+
+
 const app = createApp(App)
     .use(IonicVue)
     .use(router)
+    // .component('RecycleScroller', RecycleScroller)
     .use(store, key);
 
 router.isReady().then(() => {
