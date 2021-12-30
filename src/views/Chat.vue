@@ -7,9 +7,45 @@
     <ion-content :fullscreen="true">
       <ion-grid>
         <ion-row>
-          <ion-col size="8" style="height: 100vh">
+          <ion-col :size="currentUser.name==='ryanyen2'?6:8" style="height: 100vh">
             <div ref="twitchVideo"></div>
           </ion-col>
+          <ion-col v-if="currentUser.name==='ryanyen2'" size="2">
+            <h5>Filters</h5>
+            <ion-item>
+              <ion-label position="stacked">Ex-Emote</ion-label>
+              <ion-input type="number" v-model="filters.exEmotesFilter" />
+            </ion-item>
+            <ion-item>
+              <ion-label position="stacked">Ex-Caps</ion-label>
+              <ion-input type="number" v-model="filters.exEmotesFilter" />
+            </ion-item>
+            <ion-item>
+              <ion-label>Profanity</ion-label>
+              <input type="checkbox" v-model="filters.profanityFilter" />
+            </ion-item>
+            <ion-item>
+              <ion-label>Re-Char</ion-label>
+              <input type="checkbox" v-model="filters.repeatedCharacterFilter" />
+            </ion-item>
+            <ion-item>
+              <ion-label>Re-Words</ion-label>
+              <input type="checkbox" v-model="filters.repeatedWordsFilter" />
+            </ion-item>
+
+            <h5>Thresh / Loop</h5>
+            <ion-item>
+              <ion-label position="stacked">Norm</ion-label>
+              <ion-input type="number" v-model="loopNormThresh" />
+            </ion-item>
+            <ion-item>
+              <ion-label position="stacked">Troll</ion-label>
+              <ion-input type="number" v-model="loopTrollThresh" />
+            </ion-item>
+
+            <ion-button @click.end="filtersChangedHandler" expand="block" fill="outline">Submit</ion-button>
+          </ion-col>
+
           <ion-col size="4">
             <ion-row>
               <ion-col size="12">
@@ -32,16 +68,16 @@
                         :size-dependencies="[item.message,]"
                         :data-index="index"
                     >
-                      <div class="text"  v-html="item.message"></div>
+                      <div class="text" v-html="item.message"></div>
                     </DynamicScrollerItem>
                   </template>
-<!--                  <template v-slot="{ item }">-->
-<!--                    <ion-item style="align-items: baseline">-->
-<!--                      <ion-label>-->
-<!--                        <span v-html="item.message"></span>-->
-<!--                      </ion-label>-->
-<!--                    </ion-item>-->
-<!--                  </template>-->
+                  <!--                  <template v-slot="{ item }">-->
+                  <!--                    <ion-item style="align-items: baseline">-->
+                  <!--                      <ion-label>-->
+                  <!--                        <span v-html="item.message"></span>-->
+                  <!--                      </ion-label>-->
+                  <!--                    </ion-item>-->
+                  <!--                  </template>-->
                 </DynamicScroller>
               </ion-col>
               <ion-col size="12">
@@ -88,7 +124,7 @@ import {
   IonIcon,
   IonButton,
   IonBackButton,
-  // IonLabel
+  IonLabel
 } from "@ionic/vue";
 import {happyOutline, sendOutline} from "ionicons/icons";
 import {DynamicScroller, DynamicScrollerItem} from 'vue-virtual-scroller'
@@ -100,11 +136,13 @@ import {useStore} from "@/store";
 
 import {chatFilter} from '@/utils/chat-filter.ts'
 import {db} from '@/utils/firebase.ts';
-import {ref, push, update} from 'firebase/database';
+import {ref, push, update, onChildAdded, onChildChanged} from 'firebase/database';
 
 import bg from '@/static/images/background.gif';
 import {loadScript} from "vue-plugin-load-script";
+
 let timeInterval;
+let chatRef;
 
 export default {
   name: "Folder",
@@ -123,7 +161,7 @@ export default {
     DynamicScroller,
     DynamicScrollerItem,
     IonItem,
-    // IonLabel
+    IonLabel
   },
   data() {
     return {
@@ -135,6 +173,8 @@ export default {
       accessToken: "",
       currentUser: {},
       isAdmin: false,
+
+      // firebase chat
 
       emotesList: [],
 
@@ -184,16 +224,22 @@ export default {
     };
   },
   methods: {
-    sendMessage() {
+    async filtersChangedHandler() {
+      console.log({...this.filters})
+      await update(ref(db, `trials/trial${this.currentChannel.trialId}/configurations`), {
+        ...this.filters,
+        loopTrollThresh: this.loopTrollThresh,
+        loopNormThresh: this.loopNormThresh
+      })
+    },
+    async sendMessage() {
       if (this.message.length > 0) {
-        this.chatClient.say(this.currentChannel.userName, this.message);
-        this.messages.push({
+        // this.chatClient.say(this.currentChannel.userName, this.message);
+        await push(ref(db, `trials/trial${this.currentChannel.trialId}/chats`), {
           id: this.uuidv4(),
           user: this.currentUser.displayName,
-          message: `<p style="white-space: break-spaces"><span style="color: #ff9900">${this.currentUser.displayName}: </span>${this.message}</p>`,
-        });
-        if (this.messages.length >= 50) this.messages.shift()
-        this.message = "";
+          message: `<p style="white-space: break-spaces"><span style="color: #ff9900">${this.currentUser.displayName}: </span>${this.message}</p>`
+        })
       }
     },
     uuidv4() {
@@ -219,21 +265,21 @@ export default {
       else if (isTroll) {
         this.currentChannelMeta.trollingMessagesCount += 1
         this.currentTrollInLoop += 1
-      }
-      else if (isMe) this.currentChannelMeta.sentMessagesCount += 1
+      } else if (isMe) this.currentChannelMeta.sentMessagesCount += 1
       else {
         this.currentChannelMeta.normMessagesCount += 1
         this.currentNormInLoop += 1
       }
 
-
-      await update(ref(db, `users/${this.currentUser.id}/connectActivities/${this.currentChannel.dbKey}`), {
-        ...this.currentChannelMeta
-      })
+      if (this.currentUser.name === 'ryanyen2') {
+        await update(ref(db, `trials/trial${this.currentChannel.trialId}/connectedUsers/${this.currentUser.name}/connectActivities/${this.currentChannel.dbKey}`), {
+          ...this.currentChannelMeta
+        })
+      }
     },
     changeStoryHandler() {
       this.timer += 1
-      console.log(this.currentStoryImg, this.currentTrollInLoop, this.currentNormInLoop)
+      // console.log(this.currentStoryImg, this.currentTrollInLoop, this.currentNormInLoop)
       switch (this.currentStoryImg) {
         case 0:
           if (this.timer > 10) {
@@ -276,7 +322,7 @@ export default {
         case 7:
         case 8:
           this.countTime += 1
-          if (this.countTime > 3) {
+          if (this.countTime > 2) {
             this.countTime = 0
             this.currentStoryImg += 1
             this.currentNormInLoop = 0
@@ -295,7 +341,7 @@ export default {
       }
     },
     async storeConnectionRecord() {
-      await push(ref(db, `users/${this.currentUser.id}/connectActivities`), {
+      await push(ref(db, `trials/trial${this.currentChannel.trialId}/connectedUsers/${this.currentUser.name}/connectActivities`), {
         connectTime: new Date().getTime(),
         localeConnectTime: new Date().toLocaleString().replace(',', ''),
         streamId: this.currentChannel.id,
@@ -416,6 +462,26 @@ export default {
         this.videoPlayer.setQuality(1080);
         this.videoPlayer.setVolume(0.5);
       });
+    })
+
+    chatRef = ref(db, `trials/trial${this.currentChannel.trialId}/chats`)
+    onChildAdded(chatRef, (data) => {
+      const {id, user, message} = data.val()
+      this.messages.push({
+        id: id,
+        user: user,
+        message: message,
+      });
+      if (this.messages.length >= 50) this.messages.shift()
+      this.message = "";
+    });
+
+    const configureRef = ref(db, `trials/trial${this.currentChannel.trialId}/configurations`)
+    onChildAdded(configureRef, data => {
+      console.log('Config Added', data.key, data.val(), this.$data.filters[data.key]? this.$data.filters[data.key] : this.$data[data.key])
+    })
+    onChildChanged(configureRef, data => {
+      console.log('Config Changed', data.key, data.val())
     })
 
     timeInterval = setInterval(this.changeStoryHandler, 1000)

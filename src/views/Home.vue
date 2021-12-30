@@ -18,50 +18,78 @@
 
       <div id="container">
         <div v-if="!token.length" class="login-container">
-          <div class="wrapper">
-            <div class="border-circle" id="one"></div>
-            <div class="border-circle" id="two"></div>
-            <div class="background-circle">
-              <div class="triangle-light"></div>
-              <div class="body"></div>
-              <span class="shirt-text">S</span>
-              <span class="shirt-text">T</span>
-              <span class="shirt-text">♥</span>
-              <span class="shirt-text">R</span>
-              <span class="shirt-text">Y</span>
-              <div class="triangle-dark"></div>
-            </div>
-            <div class="head">
-              <div class="ear" id="left"></div>
-              <div class="ear" id="right"></div>
-              <div class="hair-main">
-                <div class="sideburn" id="left"></div>
-                <div class="sideburn" id="right"></div>
-                <div class="hair-top"></div>
+          <ion-row>
+            <ion-col size="5">
+              <div class="wrapper">
+                <div class="border-circle" id="one"></div>
+                <div class="border-circle" id="two"></div>
+                <div class="background-circle">
+                  <div class="triangle-light"></div>
+                  <div class="body"></div>
+                  <span class="shirt-text">S</span>
+                  <span class="shirt-text">T</span>
+                  <span class="shirt-text">♥</span>
+                  <span class="shirt-text">R</span>
+                  <span class="shirt-text">Y</span>
+                  <div class="triangle-dark"></div>
+                </div>
+                <div class="head">
+                  <div class="ear" id="left"></div>
+                  <div class="ear" id="right"></div>
+                  <div class="hair-main">
+                    <div class="sideburn" id="left"></div>
+                    <div class="sideburn" id="right"></div>
+                    <div class="hair-top"></div>
+                  </div>
+                  <div class="face">
+                    <div class="hair-bottom"></div>
+                    <div class="nose"></div>
+                    <div class="eye-shadow" id="left">
+                      <div class="eyebrow"></div>
+                      <div class="eye"></div>
+                    </div>
+                    <div class="eye-shadow" id="right">
+                      <div class="eyebrow"></div>
+                      <div class="eye"></div>
+                    </div>
+                    <div class="mouth"></div>
+                    <div class="shadow-wrapper">
+                      <div class="shadow"></div>
+                    </div>
+                  </div>
+                </div>
+                <span class="music-note" id="one">&#9835;</span>
+                <span class="music-note" id="two">&#9834;</span>
               </div>
-              <div class="face">
-                <div class="hair-bottom"></div>
-                <div class="nose"></div>
-                <div class="eye-shadow" id="left">
-                  <div class="eyebrow"></div>
-                  <div class="eye"></div>
-                </div>
-                <div class="eye-shadow" id="right">
-                  <div class="eyebrow"></div>
-                  <div class="eye"></div>
-                </div>
-                <div class="mouth"></div>
-                <div class="shadow-wrapper">
-                  <div class="shadow"></div>
-                </div>
-              </div>
-            </div>
-            <span class="music-note" id="one">&#9835;</span>
-            <span class="music-note" id="two">&#9834;</span>
-          </div>
-          <ion-button
-              style="margin-top: 20px"
-              @click.end="login"><strong class="capitalize">Login With Twitch</strong></ion-button>
+            </ion-col>
+            <ion-col size="1" />
+            <ion-col size="5">
+              <ion-card>
+                <ion-card-header>
+                  <ion-card-subtitle>Welcome to</ion-card-subtitle>
+                  <ion-card-title> StoryChat Study</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                  <ion-item>
+                    <ion-label>Name</ion-label>
+                    <ion-input v-model="trialInfo.username" clear-input type="text" placeholder="Input registered name"></ion-input>
+                  </ion-item>
+                  <ion-item>
+                    <ion-label>Email</ion-label>
+                    <ion-input v-model="trialInfo.email" clear-input type="email" placeholder="Input registered email"></ion-input>
+                  </ion-item>
+                  <ion-item>
+                    <ion-label>Trial ID</ion-label>
+                    <ion-input v-model="trialInfo.trialId" type="number" placeholder="number only"></ion-input>
+                  </ion-item>
+                </ion-card-content>
+              </ion-card>
+              <ion-button
+                  style="margin-top: 20px"
+                  @click.end="login"><strong class="capitalize">Login With Twitch</strong></ion-button>
+            </ion-col>
+            <ion-col size="1" />
+          </ion-row>
         </div>
         <div v-if="token.length && currentUser">
           <ion-card>
@@ -86,8 +114,11 @@
           </ion-card>
           <ion-card v-for="stream in streams" :key="stream.id" @click.end="connect(stream)">
             <ion-card-header>
-              <ion-card-title>{{ stream['userDisplayName']? stream.userDisplayName : stream.displayName }}</ion-card-title>
-              <ion-card-subtitle>{{ stream['title']? stream.title : stream.gameName }}</ion-card-subtitle>
+              <ion-card-title>{{
+                  stream['userDisplayName'] ? stream.userDisplayName : stream.displayName
+                }}
+              </ion-card-title>
+              <ion-card-subtitle>{{ stream['title'] ? stream.title : stream.gameName }}</ion-card-subtitle>
             </ion-card-header>
             <ion-alert
                 :is-open="openAlert"
@@ -101,7 +132,7 @@
             <ion-card-content>
               <ion-chip>
                 <ion-icon :icon="people" color="primary"></ion-icon>
-                <ion-label>{{ stream['viewers']? stream.viewers : stream.language }}</ion-label>
+                <ion-label>{{ stream['viewers'] ? stream.viewers : stream.language }}</ion-label>
               </ion-chip>
               <ion-chip>
                 <ion-icon :icon="gameControllerOutline" color="secondary"></ion-icon>
@@ -118,8 +149,8 @@
 <script lang="js">
 import {ApiClient} from '@twurple/api';
 import {StaticAuthProvider} from "@twurple/auth";
-import { db } from '@/utils/firebase.ts';
-import { ref, set, push, child, get } from 'firebase/database';
+import {db} from '@/utils/firebase.ts';
+import {ref, set, push, child, get} from 'firebase/database';
 
 import {
   IonButtons,
@@ -136,11 +167,16 @@ import {
   IonChip,
   IonLabel,
   IonIcon,
-    IonSearchbar
+  IonItem,
+  IonRow,
+  IonCol,
+  IonSearchbar,
+    IonInput,
 } from "@ionic/vue";
 
 import {people, gameControllerOutline} from 'ionicons/icons';
 import {useStore, MUTATIONS} from "@/store";
+
 let apiClient;
 
 export default {
@@ -150,6 +186,8 @@ export default {
     IonContent,
     IonHeader,
     IonMenuButton,
+    IonRow,
+    IonCol,
     IonPage,
     IonTitle,
     IonToolbar,
@@ -157,14 +195,21 @@ export default {
     IonLabel,
     IonAlert,
     IonAvatar,
+    IonItem,
     IonChip,
     IonIcon,
     IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle,
-    IonSearchbar
+    IonSearchbar,
+    IonInput
   },
   data() {
     return {
       store: null,
+      trialInfo: {
+        username: "Ryan Yen",
+        email: "ryanyen@gmail.com",
+        trialId: 0,
+      },
 
       token: "",
       currentUser: null,
@@ -186,7 +231,7 @@ export default {
         {
           text: 'Ok',
           handler: () => {
-            this.$router.push({name: 'chat', params: {...this.selectedStream}});
+            this.$router.push({name: `chat`, params: {trialId: this.trialInfo.trialId, ...this.selectedStream}});
           },
         },
       ],
@@ -205,14 +250,26 @@ export default {
   },
   methods: {
     async login() {
-      let redirectUrl = new URL(window.location.href)
-      redirectUrl.port = ''
-      redirectUrl = redirectUrl.toString().replace(/\/$/, "")
-
-      window.open(
-          `https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=${process.env.VUE_APP_CLIENT_ID}&redirect_uri=${redirectUrl.toString()}&scope=viewing_activity_read user_read channel_read chat:read channel:moderate chat:edit`,
-          '_self',
-      ).focus()
+      if (this.trialInfo.trialId < 0 || !this.trialInfo.email || !this.trialInfo.username) {
+        alert('Please filled out all the fields')
+      } else {
+        let redirectUrl = new URL(window.location.href)
+        redirectUrl.port = ''
+        redirectUrl = redirectUrl.toString().replace(/\/$/, "")
+        window.localStorage.setItem('trialId', this.trialInfo.trialId)
+        const trialName = `trial${this.trialInfo.trialId}`
+        console.log('trialName', trialName)
+        await set(ref(db, `trials/` + trialName), {
+          trialId: this.trialInfo.trialId,
+          trialName: `trial${this.trialInfo.trialId}`,
+          createdAt: new Date().getTime(),
+          connectedUsers: [],
+        }).then(res => console.log(res)).catch(console.error)
+        window.open(
+            `https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=${process.env.VUE_APP_CLIENT_ID}&redirect_uri=${redirectUrl.toString()}&scope=viewing_activity_read user_read channel_read chat:read channel:moderate chat:edit`,
+            '_self',
+        ).focus()
+      }
     },
     async connect(stream) {
       const user = await stream.getUser()
@@ -262,37 +319,21 @@ export default {
       this.currentUser = await apiClient.users.getMe()
       await this.store.commit(MUTATIONS.SET_CURRENT_USER, this.currentUser)
 
-      const geoLocation = await fetch('https://json.geoiplookup.io/');
-      const geoLocationJson = await geoLocation.json();
+      this.trialInfo.trialId = window.localStorage.getItem('trialId')
 
-      const dbRef = ref(db);
-      await get(child(dbRef, `users/${this.currentUser.id}`)).then(async res => {
-        if (res.exists()) {
-          await push(ref(db, `users/${this.currentUser.id}/loginActivities`), {
-            loginTime: new Date().getTime(),
-            localeTime: new Date().toLocaleString().replace(',',''),
-            ipAddress: geoLocationJson.ip,
-            isp: geoLocationJson.isp,
-            city: geoLocationJson.city,
-            countryCode: geoLocationJson.country_code,
-            countryName: geoLocationJson.country_name
-          })
-        }
-        else {
-          await set(ref(db, 'users/' + this.currentUser.id), {
-            username: this.currentUser.name,
-            email: this.currentUser.email,
-            displayName: this.currentUser.displayName,
-            profilePictureUrl: this.currentUser.profilePictureUrl,
-            description: this.currentUser.description,
-            views: this.currentUser.views,
-            type: this.currentUser.type,
-            firstLoginAt: new Date().getTime(),
-            loginActivities: [],
-            connectActivities: [],
-          })
-        }
-      }).catch(console.error)
+      const storedUserInfo = {
+        username: this.currentUser.name,
+        email: this.currentUser.email,
+        displayName: this.currentUser.displayName,
+        profilePictureUrl: this.currentUser.profilePictureUrl,
+        description: this.currentUser.description,
+        views: this.currentUser.views,
+        type: this.currentUser.type,
+        loginTime: new Date().getTime(),
+        localeTime: new Date().toLocaleString().replace(',', ''),
+      }
+
+      await set(ref(db, `trials/trial${this.trialInfo.trialId}/connectedUsers/${this.currentUser.name}`), {...storedUserInfo})
 
       const returnStreams = await apiClient.streams.getStreams({
         language: 'en',
