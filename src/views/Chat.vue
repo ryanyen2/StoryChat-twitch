@@ -6,7 +6,7 @@
 
     <ion-content :fullscreen="true">
       <ion-grid>
-        <ion-row>
+        <ion-row style="height: 100vh">
           <ion-col :size="currentUser.name==='ryanyen2'?6:8" style="height: 100vh">
             <div ref="twitchVideo"></div>
           </ion-col>
@@ -14,52 +14,74 @@
             <h5>Filters</h5>
             <ion-item>
               <ion-label position="stacked">Ex-Emote</ion-label>
-              <ion-input type="number" v-model="filters.exEmotesFilter" />
+              <ion-input type="number" v-model="filters.exEmotesFilter"/>
             </ion-item>
             <ion-item>
               <ion-label position="stacked">Ex-Caps</ion-label>
-              <ion-input type="number" v-model="filters.exEmotesFilter" />
+              <ion-input type="number" v-model="filters.exCapsFilter"/>
             </ion-item>
             <ion-item>
               <ion-label>Profanity</ion-label>
-              <input type="checkbox" v-model="filters.profanityFilter" />
+              <input type="checkbox" v-model="filters.profanityFilter"/>
             </ion-item>
             <ion-item>
               <ion-label>Re-Char</ion-label>
-              <input type="checkbox" v-model="filters.repeatedCharacterFilter" />
+              <input type="checkbox" v-model="filters.repeatedCharacterFilter"/>
             </ion-item>
             <ion-item>
               <ion-label>Re-Words</ion-label>
-              <input type="checkbox" v-model="filters.repeatedWordsFilter" />
+              <input type="checkbox" v-model="filters.repeatedWordsFilter"/>
             </ion-item>
 
             <h5>Thresh / Loop</h5>
             <ion-item>
               <ion-label position="stacked">Norm</ion-label>
-              <ion-input type="number" v-model="loopNormThresh" />
+              <ion-input type="number" v-model="loopNormThresh"/>
             </ion-item>
             <ion-item>
               <ion-label position="stacked">Troll</ion-label>
-              <ion-input type="number" v-model="loopTrollThresh" />
+              <ion-input type="number" v-model="loopTrollThresh"/>
             </ion-item>
 
+            <h5>Announcement</h5>
+            <ion-item>
+              <ion-label>Type</ion-label>
+              <ion-select v-model="announceInfo.type" interface="popover">
+                <ion-select-option value="ATTENTION">Attention</ion-select-option>
+                <ion-select-option value="ANNOUNCE">Announcement</ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-item>
+              <ion-label position="stacked">Announce Content</ion-label>
+              <ion-input type="text" v-model="announceInfo.content"/>
+            </ion-item>
+
+            <ion-button @click="sendAnnouncement">Send Announcement</ion-button>
             <ion-button @click.end="filtersChangedHandler" expand="block" fill="outline">Submit</ion-button>
           </ion-col>
 
           <ion-col size="4">
-            <ion-row>
-              <ion-col size="12">
+            <ion-row style="height: 100vh">
+              <ion-col size="12" v-if="currentChannel.withStory==='true'">
                 <div>
-                  <img :src="getImgUrl(currentStoryImg)" :alt="`currentImg-${currentStoryImg}`">
+                  <video
+                      style="object-fit: fill; width:100%"
+                      :loop="loopStories.includes(currentStoryPlot)"
+                      autoplay
+                      muted
+                      :src="getVideoUrl(currentStoryPlot)"
+                  >
+                  </video>
+                  <!--                  <img :src="getVideoUrl(currentStoryImg)" :alt="`currentImg-${currentStoryImg}`">-->
                 </div>
               </ion-col>
               <ion-col size="12">
                 <DynamicScroller
                     id="container"
-                    class="scroller"
+                    :style="currentChannel.withStory==='true'? 'height: 54vh' : 'height: 88vh'"
                     :items="messages"
                     key-field="id"
-                    :min-item-size="32"
+                    :min-item-size="52"
                 >
                   <template v-slot="{ item, index, active }">
                     <DynamicScrollerItem
@@ -119,9 +141,12 @@ import {
   IonGrid,
   IonRow,
   IonCol,
+  IonSelect,
+  IonSelectOption,
   IonInput,
   IonItem,
   IonIcon,
+  alertController,
   IonButton,
   IonBackButton,
   IonLabel
@@ -138,7 +163,6 @@ import {chatFilter} from '@/utils/chat-filter.ts'
 import {db} from '@/utils/firebase.ts';
 import {ref, push, update, onChildAdded, onChildChanged} from 'firebase/database';
 
-import bg from '@/static/images/background.gif';
 import {loadScript} from "vue-plugin-load-script";
 
 let timeInterval;
@@ -152,6 +176,8 @@ export default {
     IonHeader,
     IonPage,
     IonInput,
+    IonSelect,
+    IonSelectOption,
     IonIcon,
     IonGrid,
     IonRow,
@@ -174,11 +200,18 @@ export default {
       currentUser: {},
       isAdmin: false,
 
-      // firebase chat
+      // announcement
+      announceInfo: {
+        type: "",
+        content: '',
+      },
+      attentionCheckAnswer: "",
+
 
       emotesList: [],
 
       currentChannelMeta: {
+        attentionChecked: 0,
         allMessagesCount: 0,
         allMessagesList: [],
 
@@ -209,23 +242,22 @@ export default {
       videoPlayer: null,
 
       // images animation
-      timer: 0,
-      countTime: 0,
-      storyLoop: 0,
+      currentStoryPlot: 0,
+      loopStories: [1, 2, 4],
+      oneTimeStories: [0, 3, 5],
 
-      currentStoryImg: 0,
+      storyLoop: 0,
       currentTrollInLoop: 0,
       trollLoopCount: 0,
-      loopTrollThresh: 2,
+      loopTrollThresh: 3,
 
       currentNormInLoop: 0,
       normLoopCount: 0,
-      loopNormThresh: 5,
+      loopNormThresh: 10,
     };
   },
   methods: {
     async filtersChangedHandler() {
-      console.log({...this.filters})
       await update(ref(db, `trials/trial${this.currentChannel.trialId}/configurations`), {
         ...this.filters,
         loopTrollThresh: this.loopTrollThresh,
@@ -242,12 +274,60 @@ export default {
         })
       }
     },
+    async sendAnnouncement() {
+      if (this.announceInfo.content.length) {
+        await push(ref(db, `trials/trial${this.currentChannel.trialId}/announcements`), {
+          id: this.uuidv4(),
+          user: this.currentUser.displayName,
+          type: this.announceInfo.type,
+          content: this.announceInfo.content,
+        })
+      }
+    },
+    async presentAnnouncement(content) {
+      const alert = await alertController.create({
+        cssClass: 'my-custom-class',
+        header: 'ANNOUNCEMENT!',
+        message: `<strong>${content}</strong>!!!`,
+        buttons: [
+          {
+            text: 'Okay',
+          },
+        ],
+      });
+      return alert.present();
+    },
+    async presentAttentionPrompt(content) {
+      const alert = await alertController.create({
+        cssClass: 'my-custom-class',
+        header: content,
+        inputs: [
+          {
+            placeholder: 'Answer the question',
+            id: 'answer-id',
+            value: this.attentionCheckAnswer,
+          },
+        ],
+        buttons: [
+          {
+            text: 'Confirm',
+            handler: async () => {
+              this.currentChannelMeta.attentionChecked += 1
+              await update(ref(db, `trials/trial${this.currentChannel.trialId}/connectedUsers/${this.currentUser.name}/connectActivities/${this.currentChannel.dbKey}`), {
+                attentionChecked: this.currentChannelMeta.attentionChecked
+              })
+            },
+          },
+        ],
+      });
+      return alert.present();
+    },
     uuidv4() {
       return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
     },
-    getImgUrl(num) {
-      const images = require.context('../static/images/', false, /\.gif$/)
-      return images('./' + num + ".gif")
+    getVideoUrl(num) {
+      const images = require.context('../static/images/', false, /\.webm$/)
+      return images('./' + num + ".webm")
     },
     async updateMessageRecords(isAdmin, isMe, message, isTroll, trollType = null, thresh = null) {
       this.currentChannelMeta.allMessagesCount += 1
@@ -271,73 +351,57 @@ export default {
         this.currentNormInLoop += 1
       }
 
+      if (this.loopStories.includes(this.currentStoryPlot)) await this.changeStoryPlot(isTroll, trollType)
+
       if (this.currentUser.name === 'ryanyen2') {
         await update(ref(db, `trials/trial${this.currentChannel.trialId}/connectedUsers/${this.currentUser.name}/connectActivities/${this.currentChannel.dbKey}`), {
           ...this.currentChannelMeta
         })
       }
     },
-    changeStoryHandler() {
-      this.timer += 1
-      // console.log(this.currentStoryImg, this.currentTrollInLoop, this.currentNormInLoop)
-      switch (this.currentStoryImg) {
-        case 0:
-          if (this.timer > 10) {
-            this.currentStoryImg = 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-          }
-          break;
-        case 2:
-          if (this.currentTrollInLoop > this.loopTrollThresh) {
-            this.trollLoopCount += 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-            this.currentStoryImg += 1
-          } else if ((this.currentNormInLoop / 2) - this.currentTrollInLoop > this.loopNormThresh) {
-            this.currentStoryImg -= 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-          }
-          break;
-        case 1:
-        case 3:
-          if (this.currentTrollInLoop > this.loopTrollThresh) {
-            this.trollLoopCount += 1
-            this.currentTrollInLoop = 0
-            this.currentStoryImg += 1
-            this.currentNormInLoop = 0
-          }
-          break;
-        case 4:
-        case 5:
-          if ((this.currentNormInLoop - this.currentTrollInLoop) > this.loopNormThresh) {
-            this.normLoopCount += 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-            this.currentStoryImg += 1
-          }
-          break;
-        case 6:
-        case 7:
-        case 8:
-          this.countTime += 1
-          if (this.countTime > 2) {
-            this.countTime = 0
-            this.currentStoryImg += 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-          }
-          break;
-        case 9:
-          if (this.currentTrollInLoop > this.loopTrollThresh) {
-            this.trollLoopCount += 1
-            this.currentNormInLoop = 0
-            this.currentTrollInLoop = 0
-            this.currentStoryImg = 1
-            this.storyLoop += 1
-          }
-          break;
+    async changeStoryPlot(isTroll, trollType) {
+      if (isTroll && this.currentStoryPlot === 2) {
+        console.log('Troll2', this.currentTrollInLoop, this.currentNormInLoop)
+        if (trollType === 'profanity' || this.currentTrollInLoop > this.loopTrollThresh) {
+          this.currentNormInLoop = 0
+          this.currentTrollInLoop = 0
+          this.currentStoryPlot += 1
+          this.trollLoopCount += 1
+        } else if (((this.currentNormInLoop / 2) - this.currentTrollInLoop) > this.loopNormThresh) {
+          this.currentNormInLoop = 0
+          this.currentTrollInLoop = 0
+          this.currentStoryPlot = 1
+        }
+      }
+      else if (
+          isTroll &&
+          this.currentStoryPlot === 1 &&
+          (trollType === 'profanity' || this.currentTrollInLoop > this.loopTrollThresh)
+      ) {
+        console.log('Troll1', this.currentTrollInLoop, this.currentNormInLoop)
+        this.currentNormInLoop = 0
+        this.currentTrollInLoop = 0
+        this.currentStoryPlot += 1
+        this.trollLoopCount += 1
+      } else if (
+          !isTroll &&
+          this.currentStoryPlot === 4 &&
+          ((this.currentNormInLoop / 2) - this.currentTrollInLoop) > this.loopNormThresh
+      ) {
+        console.log('Norm', this.currentTrollInLoop, this.currentNormInLoop)
+        this.currentStoryPlot = 5
+        this.currentNormInLoop = 0
+        this.currentTrollInLoop = 0
+        this.normLoopCount += 1
+      }
+      // console.log(this.currentStoryPlot, this.currentTrollInLoop, this.currentNormInLoop)
+
+      if (this.currentUser.name === 'ryanyen2') {
+        await update(ref(db, `trials/trial${this.currentChannel.trialId}/connectedUsers/${this.currentUser.name}/story`), {
+          storyLoop: this.storyLoop,
+          trollLoopCount: this.trollLoopCount,
+          normLoopCount: this.normLoopCount
+        })
       }
     },
     async storeConnectionRecord() {
@@ -360,7 +424,6 @@ export default {
       sendOutline,
       happyOutline,
       clientId: process.env.VUE_APP_CLIENT_ID,
-      bg,
     };
   },
   async mounted() {
@@ -370,7 +433,7 @@ export default {
     if (this.currentUser.name === process.env.VUE_APP_ADMIN_NAME) this.isAdmin = true
 
     this.currentChannel = this.$route.params
-    // console.log(this.currentChannel)
+    console.log('Channel', this.currentChannel)
     // window.open(`https://www.twitch.tv/${this.currentChannel.userName}`, '_blank').focus()
 
     await this.storeConnectionRecord();
@@ -424,6 +487,7 @@ export default {
           if (largeTextFilter > 0) this.containLargeText = message.length >= largeTextFilter
           if (exCapsFilter > 0) this.containExCaps = ((message.length - message.replace(/[A-Z]/g, '').length) / message.length) >= exCapsFilter
 
+          let isTrollMsg = true
           const sentByMe = this.currentUser.displayName === user
           const isSentByAdmin = this.currentUser.displayName === user
           if (this.containProfanity) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'profanity', null)
@@ -433,15 +497,16 @@ export default {
           // else if (this.containRepeatedCharacter) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'repChar', null)
           else if (this.containLargeText) await this.updateMessageRecords(isSentByAdmin, sentByMe, message, true, 'largeText', largeTextFilter)
           else {
+            isTrollMsg = false
             await this.updateMessageRecords(isSentByAdmin, sentByMe, message, false)
           }
 
           const colorMsg = msg.userInfo.color ? msg.userInfo.color : '#9147FF';
-
+          const trollMsgColor = isTrollMsg ? 'rgba(134,134,134,0.5)' : '#ffffff'
           this.messages.push({
             id: msg.id,
             user: user,
-            message: `<p style="white-space: break-spaces"><span style="color: ${colorMsg}">${user}: </span>${message}</p>`,
+            message: `<p style="white-space: break-spaces; color: ${trollMsgColor}"><span style="color: ${colorMsg}">${user}: </span>${message}</p>`,
           });
           if (this.messages.length >= 50) this.messages.shift()
 
@@ -464,6 +529,15 @@ export default {
       });
     })
 
+    onChildAdded(ref(db, `trials/trial${this.currentChannel.trialId}/announcements`), async (data) => {
+      const {type, content} = data.val()
+      if (type === 'ATTENTION' && this.currentUser.name !== 'ryanyen2') {
+        await this.presentAttentionPrompt(content)
+      } else if (type === 'ANNOUNCE' && this.currentUser.name !== 'ryanyen2') {
+        await this.presentAnnouncement(content)
+      }
+    })
+
     chatRef = ref(db, `trials/trial${this.currentChannel.trialId}/chats`)
     onChildAdded(chatRef, (data) => {
       const {id, user, message} = data.val()
@@ -477,14 +551,34 @@ export default {
     });
 
     const configureRef = ref(db, `trials/trial${this.currentChannel.trialId}/configurations`)
-    onChildAdded(configureRef, data => {
-      console.log('Config Added', data.key, data.val(), this.$data.filters[data.key]? this.$data.filters[data.key] : this.$data[data.key])
+    await update(configureRef, {
+      ...this.filters,
+      loopTrollThresh: this.loopTrollThresh,
+      loopNormThresh: this.loopNormThresh
     })
     onChildChanged(configureRef, data => {
-      console.log('Config Changed', data.key, data.val())
+      this.$data.filters[data.key] ? this.$data.filters[data.key] = data.val() : this.$data[data.key] = data.val()
+      // console.log('Config Changed', data.key, data.val(), this.$data.filters[data.key] ? this.$data.filters[data.key] : this.$data[data.key])
     })
 
-    timeInterval = setInterval(this.changeStoryHandler, 1000)
+    const video = document.querySelector('video');
+    video.addEventListener('loadedmetadata', (e) => {
+      const player = e.target;
+      player.width = player.clientWidth;
+      player.height = player.clientHeight;
+    });
+    video.onended = () => {
+      console.log('video end: ', this.currentStoryPlot)
+      if (this.oneTimeStories.includes(this.currentStoryPlot)) {
+        if (this.currentStoryPlot < 5) this.currentStoryPlot += 1
+        else {
+          this.storyLoop += 1
+          this.currentStoryPlot = 1
+        }
+        this.currentNormInLoop = 0
+        this.currentTrollInLoop = 0
+      }
+    };
   },
   beforeUnmount() {
     this.chatClient.removeListener(this.followAgeListener);
@@ -517,9 +611,5 @@ export default {
 
 #container a {
   text-decoration: none;
-}
-
-.scroller {
-  height: 50vh;
 }
 </style>

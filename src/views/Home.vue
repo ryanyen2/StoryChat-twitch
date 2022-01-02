@@ -82,11 +82,15 @@
                     <ion-label>Trial ID</ion-label>
                     <ion-input v-model="trialInfo.trialId" type="number" placeholder="number only"></ion-input>
                   </ion-item>
+                  <ion-item>
+                    <ion-label> {{trialInfo.withStory? 'With Story' : 'Without Story'}} </ion-label>
+                    <ion-toggle color="primary" v-model="trialInfo.withStory"></ion-toggle>
+                  </ion-item>
                 </ion-card-content>
               </ion-card>
               <ion-button
                   style="margin-top: 20px"
-                  @click.end="login"><strong class="capitalize">Login With Twitch</strong></ion-button>
+                  @click.end="login"><strong class="capitalize">Login with Twitch</strong></ion-button>
             </ion-col>
             <ion-col size="1" />
           </ion-row>
@@ -150,7 +154,7 @@
 import {ApiClient} from '@twurple/api';
 import {StaticAuthProvider} from "@twurple/auth";
 import {db} from '@/utils/firebase.ts';
-import {ref, set, push, child, get} from 'firebase/database';
+import {ref, set} from 'firebase/database';
 
 import {
   IonButtons,
@@ -172,6 +176,7 @@ import {
   IonCol,
   IonSearchbar,
     IonInput,
+    IonToggle,
 } from "@ionic/vue";
 
 import {people, gameControllerOutline} from 'ionicons/icons';
@@ -194,6 +199,7 @@ export default {
     IonButton,
     IonLabel,
     IonAlert,
+    IonToggle,
     IonAvatar,
     IonItem,
     IonChip,
@@ -209,6 +215,7 @@ export default {
         username: "Ryan Yen",
         email: "ryanyen@gmail.com",
         trialId: 0,
+        withStory: false,
       },
 
       token: "",
@@ -231,7 +238,14 @@ export default {
         {
           text: 'Ok',
           handler: () => {
-            this.$router.push({name: `chat`, params: {trialId: this.trialInfo.trialId, ...this.selectedStream}});
+            this.$router.push({
+              name: `chat`,
+              params: {
+                withStory: this.trialInfo.withStory? 'true':'false',
+                trialId: this.trialInfo.trialId,
+                ...this.selectedStream
+              }
+            });
           },
         },
       ],
@@ -257,14 +271,18 @@ export default {
         redirectUrl.port = ''
         redirectUrl = redirectUrl.toString().replace(/\/$/, "")
         window.localStorage.setItem('trialId', this.trialInfo.trialId)
+        window.localStorage.setItem('withStory', this.trialInfo.withStory)
+
         const trialName = `trial${this.trialInfo.trialId}`
-        console.log('trialName', trialName)
+        console.log('Trial: ', this.trialInfo)
         await set(ref(db, `trials/` + trialName), {
           trialId: this.trialInfo.trialId,
           trialName: `trial${this.trialInfo.trialId}`,
+          withStory: this.trialInfo.withStory,
           createdAt: new Date().getTime(),
           connectedUsers: [],
         }).then(res => console.log(res)).catch(console.error)
+
         window.open(
             `https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=${process.env.VUE_APP_CLIENT_ID}&redirect_uri=${redirectUrl.toString()}&scope=viewing_activity_read user_read channel_read chat:read channel:moderate chat:edit`,
             '_self',
@@ -320,6 +338,7 @@ export default {
       await this.store.commit(MUTATIONS.SET_CURRENT_USER, this.currentUser)
 
       this.trialInfo.trialId = window.localStorage.getItem('trialId')
+      this.trialInfo.withStory = window.localStorage.getItem('withStory')
 
       const storedUserInfo = {
         username: this.currentUser.name,
