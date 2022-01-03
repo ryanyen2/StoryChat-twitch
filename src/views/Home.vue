@@ -241,7 +241,7 @@ export default {
             this.$router.push({
               name: `chat`,
               params: {
-                withStory: this.trialInfo.withStory? 'true':'false',
+                withStory: this.trialInfo.withStory,
                 trialId: this.trialInfo.trialId,
                 ...this.selectedStream
               }
@@ -339,6 +339,7 @@ export default {
 
       this.trialInfo.trialId = window.localStorage.getItem('trialId')
       this.trialInfo.withStory = window.localStorage.getItem('withStory')
+      console.log('>>>', this.trialInfo.withStory)
 
       const storedUserInfo = {
         username: this.currentUser.name,
