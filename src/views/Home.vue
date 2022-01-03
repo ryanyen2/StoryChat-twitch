@@ -212,8 +212,8 @@ export default {
     return {
       store: null,
       trialInfo: {
-        username: "Ryan Yen",
-        email: "ryanyen@gmail.com",
+        username: "",
+        email: "",
         trialId: 0,
         withStory: false,
       },

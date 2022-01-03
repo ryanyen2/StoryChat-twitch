@@ -295,6 +295,7 @@ export default {
           },
         ],
       });
+
       return alert.present();
     },
     async presentAttentionPrompt(content) {
