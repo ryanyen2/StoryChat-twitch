@@ -377,7 +377,7 @@ export default {
       else if (
           isTroll &&
           this.currentStoryPlot === 1 &&
-          (trollType === 'profanity' || this.currentTrollInLoop > this.loopTrollThresh)
+          (trollType === 'profanity' || (this.currentTrollInLoop - (this.currentNormInLoop/10))> this.loopTrollThresh)
       ) {
         console.log('Troll1', this.currentTrollInLoop, this.currentNormInLoop)
         this.currentNormInLoop = 0
