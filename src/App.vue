@@ -94,6 +94,9 @@ export default defineComponent({
       warningSharp,
       isSelected: (url: string) => url === route.path ? 'selected' : ''
     }
+  },
+  created() {
+    document.documentElement.setAttribute("data-theme", "dark");
   }
 });
 </script>
