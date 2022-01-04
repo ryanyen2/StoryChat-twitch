@@ -96,7 +96,7 @@ export default defineComponent({
     }
   },
   created() {
-    document.documentElement.setAttribute("data-theme", "dark");
+    // document.documentElement.setAttribute("data-theme", "dark");
   }
 });
 </script>

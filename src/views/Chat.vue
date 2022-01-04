@@ -452,6 +452,9 @@ export default {
     this.chatClient = new ChatClient({authProvider, channels: [this.currentChannel.userName]});
     await this.chatClient.connect();
 
+    let c = '#000000'
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) c = '#ffffff'
+
     this.followAgeListener = this.chatClient.onMessage(
         async (channel, user, message, msg) => {
           this.containExEmotes = false
@@ -503,7 +506,7 @@ export default {
           }
 
           const colorMsg = msg.userInfo.color ? msg.userInfo.color : '#9147FF';
-          const trollMsgColor = isTrollMsg ? 'rgba(134,134,134,0.5)' : '#ffffff'
+          const trollMsgColor = isTrollMsg ? 'rgba(134,134,134,0.5)' : c
           this.messages.push({
             id: msg.id,
             user: user,
