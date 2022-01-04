@@ -154,7 +154,7 @@
 import {ApiClient} from '@twurple/api';
 import {StaticAuthProvider} from "@twurple/auth";
 import {db} from '@/utils/firebase.ts';
-import {ref, set} from 'firebase/database';
+import {ref, set, get } from 'firebase/database';
 
 import {
   IonButtons,
@@ -274,15 +274,22 @@ export default {
         window.localStorage.setItem('withStory', this.trialInfo.withStory)
 
         const trialName = `trial${this.trialInfo.trialId}`
+        const trialRef = ref(db, `trials/` + trialName)
         console.log('Trial: ', this.trialInfo)
-        await set(ref(db, `trials/` + trialName), {
-          trialId: this.trialInfo.trialId,
-          trialName: `trial${this.trialInfo.trialId}`,
-          withStory: this.trialInfo.withStory,
-          createdAt: new Date().getTime(),
-          connectedUsers: [],
-        }).then(res => console.log(res)).catch(console.error)
 
+        await get(trialRef).then(async (snapshot) => {
+          if (!snapshot.exists()) {
+            await set(trialRef, {
+              trialId: this.trialInfo.trialId,
+              trialName: `trial${this.trialInfo.trialId}`,
+              withStory: this.trialInfo.withStory,
+              createdAt: new Date().getTime(),
+              connectedUsers: [],
+            }).then(res => console.log(res)).catch(console.error)
+          }
+        }).catch((error) => {
+          console.error(error);
+        });
         window.open(
             `https://id.twitch.tv/oauth2/authorize?response_type=token&client_id=${process.env.VUE_APP_CLIENT_ID}&redirect_uri=${redirectUrl.toString()}&scope=viewing_activity_read user_read channel_read chat:read channel:moderate chat:edit`,
             '_self',
